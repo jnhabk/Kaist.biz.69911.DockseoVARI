@@ -20,5 +20,5 @@ What they do today instead: 발제 아이디어는 ChatGPT 같은 AI 검색이�
 |-|-|
 |김지원|[@jiwonemilykim](https://github.com/jiwonemilykim)|
 |박지수|[@jisupark0104](https://github.com/jisupark0104)|
-|박진하|[@jinhabk](https://github.com/jinhabk)|
+|박진하|[@jnhabk](https://github.com/jnhabk)|
 |정민영|[@kie1057](https://github.com/kie1057)|
