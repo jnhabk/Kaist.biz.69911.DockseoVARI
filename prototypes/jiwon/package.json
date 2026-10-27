@@ -1,0 +1,16 @@
+{
+  "name": "jiwon-ai-discussion-questions",
+  "private": true,
+  "type": "module",
+  "description": "AI 발제 질문 P0 프로토타입 (docs/specs/jiwon-feature.md)",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "t4": "node server.js --mock data/t4-ai-response.json"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "latest"
+  }
+}

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>발제 질문 만들기</title>
+  <style>
+    :root {
+      --bg: #f7f5f0; --card: #ffffff; --text: #22201c; --muted: #6b665c;
+      --line: #e3ded3; --accent: #3b5bdb; --warn-bg: #fff4e0; --warn-line: #f0c36d;
+      --err-bg: #fdecec; --err-line: #e7a3a3; --test-bg: #eef1ff;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.6 -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
+    h1 { font-size: 1.5rem; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 20px; }
+    .test-mode { background: var(--test-bg); border: 1px solid var(--accent); border-radius: 8px;
+      padding: 8px 12px; margin-bottom: 16px; font-size: .9rem; }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+    label { font-weight: 600; display: block; margin-bottom: 6px; }
+    select { width: 100%; padding: 8px; font: inherit; border: 1px solid var(--line); border-radius: 8px; }
+    .stats { color: var(--muted); margin: 8px 0 16px; font-size: .95rem; }
+    button { font: inherit; border: 0; border-radius: 8px; padding: 10px 16px; cursor: pointer;
+      background: var(--accent); color: #fff; font-weight: 600; }
+    button:disabled { opacity: .5; cursor: default; }
+    .notice { margin-top: 16px; border-radius: 8px; padding: 12px 14px; }
+    .notice.blocked { background: var(--warn-bg); border: 1px solid var(--warn-line); }
+    .notice.failed { background: var(--err-bg); border: 1px solid var(--err-line); display: flex;
+      align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .notice.failed button { background: var(--text); }
+    ol.questions { list-style: none; padding: 0; margin: 20px 0 0; counter-reset: q; }
+    ol.questions > li { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      padding: 16px; margin-bottom: 12px; counter-increment: q; }
+    .q { font-weight: 600; margin: 0 0 10px; }
+    .q::before { content: "Q" counter(q) ". "; color: var(--accent); }
+    blockquote { margin: 8px 0 0; padding: 8px 12px; border-left: 3px solid var(--line); background: var(--bg);
+      border-radius: 0 8px 8px 0; }
+    .count { display: block; color: var(--muted); font-size: .85rem; margin-top: 4px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>발제 질문 만들기</h1>
+    <p class="sub">모임장 화면 · 멤버들의 밑줄 기록에서 발제 질문 초안을 만들어요.</p>
+
+    <div class="test-mode" id="testMode" hidden></div>
+
+    <section class="panel">
+      <label for="dataset">이번 회차 기록 (샘플 파일)</label>
+      <select id="dataset"></select>
+      <p class="stats" id="stats"></p>
+      <button id="generate" type="button">발제 질문 만들기</button>
+    </section>
+
+    <div class="notice blocked" id="blocked" role="status" hidden></div>
+    <div class="notice failed" id="failed" role="alert" hidden>
+      <span>지금 만들 수 없어요</span>
+      <button id="retry" type="button">다시 시도</button>
+    </div>
+
+    <ol class="questions" id="questions"></ol>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
