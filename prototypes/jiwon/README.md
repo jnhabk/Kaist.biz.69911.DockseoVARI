@@ -1,6 +1,6 @@
 # AI 발제 질문 — P0 프로토타입
 
-`docs/specs/jiwon-feature.md`의 P0만 구현했다. 모임장 화면 하나, 샘플 기록 파일, 로그인·계정·DB 없음.
+`docs/specs/jiwon-discussion-questions.md`의 P0만 구현했다. 모임장 화면 하나, 샘플 기록 파일, 로그인·계정·DB 없음.
 
 ## 구성
 

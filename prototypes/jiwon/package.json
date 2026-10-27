@@ -2,7 +2,7 @@
   "name": "jiwon-ai-discussion-questions",
   "private": true,
   "type": "module",
-  "description": "AI 발제 질문 P0 프로토타입 (docs/specs/jiwon-feature.md)",
+  "description": "AI 발제 질문 P0 프로토타입 (docs/specs/jiwon-discussion-questions.md)",
   "engines": {
     "node": ">=22"
   },

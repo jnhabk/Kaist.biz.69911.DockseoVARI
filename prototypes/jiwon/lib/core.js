@@ -1,5 +1,5 @@
 // 발제 질문 프로토타입의 핵심 규칙. Node 기능을 쓰지 않아서 브라우저에서도 그대로 시험할 수 있다.
-// 규칙의 출처: docs/specs/jiwon-feature.md (P0)
+// 규칙의 출처: docs/specs/jiwon-discussion-questions.md (P0)
 
 export const MIN_MEMBERS = 2;
 export const MIN_UNDERLINES = 5;
