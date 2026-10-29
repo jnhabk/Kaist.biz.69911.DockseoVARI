@@ -8,7 +8,9 @@ API 키는 이 서버만 .env에서 읽고, 브라우저로는 보내지 않는�
 
 import json
 import os
+import re
 import sys
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -27,6 +29,9 @@ from summarize import (
 HERE = Path(__file__).parent
 PORT = int(os.environ.get("PORT", "8000"))
 SAMPLE = HERE / "data" / "sample-meeting.txt"
+# 모임 하나당 JSON 파일 하나. 실명과 대화 원문이 들어 있어 .gitignore 대상이다.
+RECORDS = HERE / "records"
+RECORD_ID = re.compile(r"^\d{8}-\d{6}(-\d+)?$")
 
 
 def load_env():
@@ -70,7 +75,83 @@ def _log_ungrounded(issue):
             print(f"[근거 확인 안 됨] {v['member']}: {v['quote']}")
 
 
-def summarize(transcript, names):
+def _record_path(record_id):
+    if not RECORD_ID.match(record_id or ""):
+        return None
+    return RECORDS / f"{record_id}.json"
+
+
+def load_record(record_id):
+    path = _record_path(record_id)
+    if not path or not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def save_record(record):
+    RECORDS.mkdir(exist_ok=True)
+    _record_path(record["id"]).write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def clean_meeting(meeting):
+    """모임 정보: 날짜(YYYY-MM-DD, 없거나 이상하면 오늘), 장소, 읽은 책."""
+    meeting = meeting if isinstance(meeting, dict) else {}
+    date = str(meeting.get("date", "")).strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        date = datetime.now().strftime("%Y-%m-%d")
+    return {
+        "date": date,
+        "place": str(meeting.get("place", "")).strip()[:60],
+        "book": str(meeting.get("book", "")).strip()[:100],
+    }
+
+
+def new_record(utterances, names, result, meeting):
+    """정리 결과를 자동 저장한다. 큐레이션·발제의 재료로 쓰기 쉽게 항목별로 나눠 둔다."""
+    now = datetime.now()
+    record_id = now.strftime("%Y%m%d-%H%M%S")
+    n = 1
+    while _record_path(record_id).exists():
+        n += 1
+        record_id = f"{now:%Y%m%d-%H%M%S}-{n}"
+    record = {
+        "id": record_id,
+        "saved_at": now.isoformat(timespec="seconds"),
+        "test_mode": bool(MOCK),
+        "meeting": clean_meeting(meeting),
+        "members": list(dict.fromkeys(who for who, _ in utterances)),
+        "names": names,
+        "utterances": [{"speaker": who, "text": said} for who, said in utterances],
+        "result": result,
+        "expanded": {},
+    }
+    save_record(record)
+    return record
+
+
+def list_records():
+    if not RECORDS.exists():
+        return []
+    items = []
+    for path in sorted(RECORDS.glob("*.json"), reverse=True):
+        try:
+            r = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        items.append({
+            "id": r["id"],
+            "saved_at": r.get("saved_at", ""),
+            "meeting": r.get("meeting") or {"date": r.get("saved_at", "")[:10], "place": "", "book": ""},
+            "one_line": r.get("result", {}).get("one_line", ""),
+            "members": r.get("members", []),
+            "test_mode": r.get("test_mode", False),
+        })
+    # 모임 날짜 최신순, 같은 날이면 나중에 저장한 것 먼저
+    items.sort(key=lambda i: (i["meeting"]["date"], i["saved_at"]), reverse=True)
+    return items
+
+
+def summarize(transcript, names, meeting=None):
     utterances = apply_names(parse_transcript(transcript), names)
     if not utterances:
         return EMPTY
@@ -86,12 +167,21 @@ def summarize(transcript, names):
         return {"status": "failed"}
     for issue in result["issues"]:
         _log_ungrounded(issue)
-    return {"status": "ok", "result": result}
+    record = new_record(utterances, names, result, meeting)
+    print(f"[저장] records/{record['id']}.json")
+    return {"status": "ok", "record": record}
 
 
-def expand(transcript, names, topic):
-    """[더 알아보기]: 그 밖에 나온 이야기 하나를 쟁점 카드로 펼친다."""
-    utterances = apply_names(parse_transcript(transcript), names)
+def expand(transcript, names, topic, record_id=None):
+    """[더 알아보기]: 그 밖에 나온 이야기 하나를 쟁점 카드로 펼친다.
+
+    record_id가 있으면 저장된 원문을 쓰고, 펼친 카드를 그 기록에 더해 저장한다.
+    """
+    record = load_record(record_id) if record_id else None
+    if record:
+        utterances = [(u["speaker"], u["text"]) for u in record["utterances"]]
+    else:
+        utterances = apply_names(parse_transcript(transcript), names)
     topic = topic.strip()[:200]
     if not utterances or not topic:
         return EMPTY
@@ -105,6 +195,9 @@ def expand(transcript, names, topic):
         print(f"[더 알아보기 실패] {e}")
         return {"status": "failed"}
     _log_ungrounded(issue)
+    if record:
+        record["expanded"][topic] = issue
+        save_record(record)
     return {"status": "ok", "issue": issue}
 
 
@@ -126,6 +219,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, "text/html; charset=utf-8", (HERE / "public" / "index.html").read_bytes())
         if self.path == "/api/sample":
             return self._json({"transcript": SAMPLE.read_text(encoding="utf-8"), "testMode": MOCK.name if MOCK else None})
+        if self.path == "/api/records":
+            return self._json({"records": list_records()})
+        if self.path.startswith("/api/records/"):
+            record = load_record(self.path.rsplit("/", 1)[-1])
+            if record:
+                return self._json({"record": record})
+            return self._json({"status": "not_found"}, 404)
         self._send(404, "text/plain; charset=utf-8", "없는 주소예요.")
 
     def do_POST(self):
@@ -141,8 +241,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/speakers":
                 return self._json({"speakers": list_speakers(parse_transcript(transcript))})
             if self.path == "/api/expand":
-                return self._json(expand(transcript, names, str(body.get("topic", ""))))
-            self._json(summarize(transcript, names))
+                return self._json(expand(transcript, names, str(body.get("topic", "")), body.get("record_id")))
+            self._json(summarize(transcript, names, body.get("meeting")))
         except Exception as e:  # 화면에는 늘 같은 실패 안내를 보낸다
             print(f"[서버 오류] {e}")
             self._json({"status": "failed"}, 500)

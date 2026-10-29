@@ -2,6 +2,9 @@ node_modules/
 __pycache__/
 *.pyc
 
+# 실제 모임 대화 기록: 실명과 대화 원문이 들어 있어 커밋하지 않는다
+prototypes/Minyeong/records/
+
 # 비밀 값: API 키 등은 .env 계열 파일에만 두고 커밋하지 않는다
 .env
 .env.*
