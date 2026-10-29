@@ -1,2 +1,13 @@
 node_modules/
+
+# 비밀 값: API 키 등은 .env 계열 파일에만 두고 커밋하지 않는다
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# 로그와 OS 파일
+npm-debug.log*
+.DS_Store
+Thumbs.db
