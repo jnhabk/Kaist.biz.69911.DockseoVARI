@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>모임 기록·요약</title>
+<style>
+  :root { --ink:#222; --muted:#6b6b6b; --line:#e3e0d8; --card:#faf8f3; --accent:#2f6b4f; --warn:#a34a12; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Malgun Gothic", sans-serif; color:var(--ink); background:#fff; line-height:1.6; }
+  main { max-width: 680px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 8px 0 4px; }
+  h2 { font-size: 16px; margin: 24px 0 8px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .test { background:#fff4e5; border:1px solid #f0c48a; padding:8px 12px; border-radius:8px; font-size:14px; }
+  textarea { width:100%; min-height: 180px; font: inherit; font-size: 14px; padding: 10px; border:1px solid var(--line); border-radius:8px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin: 8px 0; }
+  button { font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 8px; border:1px solid #bbb; background:#fff; cursor:pointer; }
+  button.primary { background: var(--accent); color:#fff; border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .card { background: var(--card); border:1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 10px 0; }
+  .oneline { font-size: 17px; font-weight: 600; }
+  .q { font-weight: 600; margin-bottom: 6px; }
+  .view { margin: 6px 0 6px 4px; }
+  .who { font-weight: 600; }
+  blockquote { margin: 2px 0 0 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); font-size: 14px; }
+  .badge { display:inline-block; font-size: 12px; color: var(--warn); border:1px solid var(--warn); border-radius: 6px; padding: 0 6px; margin-left: 6px; }
+  .label { font-size: 13px; color: var(--accent); font-weight: 600; margin-top: 8px; }
+  .empty { color: var(--muted); font-size: 14px; }
+  .error { border-color: #e2b4a0; background: #fdf3ee; }
+  .speaker { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin: 6px 0; }
+  .speaker .tag { font-weight:600; min-width: 72px; }
+  .speaker input { font: inherit; font-size: 14px; padding: 6px 8px; border:1px solid var(--line); border-radius: 6px; width: 120px; }
+  .speaker .first { flex: 1 1 200px; color: var(--muted); font-size: 13px; }
+  li .more { margin-left: 8px; padding: 2px 8px; font-size: 13px; }
+  .ai { margin-top: 12px; padding: 10px 12px; border: 1px dashed #8a7bd1; border-radius: 10px; background: #f4f2fd; }
+  .ai-title { font-size: 13px; font-weight: 700; color: #4b3fa3; }
+  .ai-note { font-size: 12px; color: var(--muted); }
+  .ai ul { margin: 6px 0 0; padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>모임 기록·요약</h1>
+  <p class="muted">모임 대화를 넣으면 쟁점, 사람별 생각과 전제, 남은 질문을 정리해 줍니다.</p>
+  <p id="test" class="test" hidden></p>
+
+  <div class="row">
+    <button disabled title="P1: 앱 안 녹음 + 자동 화자 구분">● 녹음 시작 (준비 중)</button>
+    <button id="sample">샘플 대화 불러오기</button>
+  </div>
+  <textarea id="transcript" placeholder="한 줄에 한 발언, '화자: 발언' 형태나 클로바노트에서 내보낸 텍스트를 붙여 넣어 주세요.&#10;예) 참석자 1: 저는 주인공이 이기적이라고 생각하지 않아요."></textarea>
+  <section id="speakers" hidden>
+    <h2>화자 이름 맞추기</h2>
+    <p class="muted">화자마다 실명을 적어 주세요. 비워 두면 원래 표시를 그대로 써요.</p>
+    <div id="speakerList"></div>
+  </section>
+  <div class="row">
+    <button id="go" class="primary">정리하기</button>
+  </div>
+
+  <div id="out"></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const NOT_FOUND = "이번 대화에서는 찾지 못했어요";
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function section(title, children) {
+  const box = el("section");
+  box.append(el("h2", null, title));
+  if (!children.length) box.append(el("p", "empty", NOT_FOUND));
+  else box.append(...children);
+  return box;
+}
+
+function issueCard(issue) {
+  const c = el("div", "card");
+  c.append(el("div", "q", "Q. " + issue.question));
+  if (!issue.views.length) c.append(el("p", "empty", NOT_FOUND));
+  for (const v of issue.views) {
+    const row = el("div", "view");
+    const head = el("div");
+    head.append(el("span", "who", v.member + ": "), document.createTextNode(v.view));
+    if (!v.grounded) head.append(el("span", "badge", "근거 확인 안 됨"));
+    row.append(head);
+    if (v.quote) row.append(el("blockquote", null, "“" + v.quote + "”"));
+    c.append(row);
+  }
+  c.append(el("div", "label", "갈린 이유"), el("div", issue.divergence_reason ? null : "empty", issue.divergence_reason || NOT_FOUND));
+  c.append(el("div", "label", "공통점"), el("div", issue.common_ground ? null : "empty", issue.common_ground || NOT_FOUND));
+  if (issue.ai_questions && issue.ai_questions.length) {
+    const ai = el("div", "ai");
+    ai.append(el("div", "ai-title", "AI 제안 · 더 생각해 볼 질문"));
+    ai.append(el("div", "ai-note", "대화 기록이 아니라 AI가 제안한 질문이에요."));
+    const ul = el("ul");
+    for (const q of issue.ai_questions) ul.append(el("li", null, q));
+    ai.append(ul);
+    c.append(ai);
+  }
+  return c;
+}
+
+// 화자 이름 맞추기: 대화가 바뀌면 화자 목록을 다시 받는다. 이미 적은 이름은 유지한다.
+let speakerTimer;
+function refreshSpeakers() {
+  clearTimeout(speakerTimer);
+  speakerTimer = setTimeout(async () => {
+    const typed = currentNames();
+    const res = await fetch("/api/speakers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript: $("transcript").value }),
+    });
+    const { speakers } = await res.json();
+    const list = $("speakerList");
+    list.replaceChildren();
+    for (const s of speakers) {
+      const row = el("div", "speaker");
+      const input = el("input");
+      input.dataset.label = s.label;
+      input.placeholder = "실명";
+      input.value = typed[s.label] || "";
+      row.append(el("span", "tag", s.label), input, el("span", "first", "“" + s.first + "”"));
+      list.append(row);
+    }
+    $("speakers").hidden = speakers.length === 0;
+  }, 300);
+}
+
+function currentNames() {
+  const names = {};
+  for (const input of document.querySelectorAll("#speakerList input")) {
+    if (input.value.trim()) names[input.dataset.label] = input.value.trim();
+  }
+  return names;
+}
+
+async function expandTopic(topic, slot, button) {
+  button.disabled = true;
+  slot.replaceChildren(el("p", "muted", "펼치는 중이에요…"));
+  try {
+    const res = await fetch("/api/expand", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript: $("transcript").value, names: currentNames(), topic }),
+    });
+    const data = await res.json();
+    if (data.status === "ok") {
+      slot.replaceChildren(issueCard(data.issue));
+      button.remove();
+      return;
+    }
+    throw new Error();
+  } catch {
+    const c = el("div", "card error");
+    c.append(el("p", null, "지금 펼칠 수 없어요."));
+    const retry = el("button", null, "다시 시도");
+    retry.onclick = () => expandTopic(topic, slot, button);
+    c.append(retry);
+    slot.replaceChildren(c);
+    button.disabled = false;
+  }
+}
+
+function render(r) {
+  const out = $("out");
+  out.replaceChildren();
+
+  const top = el("div", "card");
+  top.append(el("div", r.one_line ? "oneline" : "empty", r.one_line || NOT_FOUND));
+  out.append(section("한 줄 요약", [top]));
+
+  out.append(section("쟁점", r.issues.map(issueCard)));
+
+  out.append(section("멤버", r.members.map((m) => {
+    const c = el("div", "card");
+    c.append(el("div", "q", m.name));
+    c.append(el("div", "label", "전제"), el("div", m.premise ? null : "empty", m.premise || NOT_FOUND));
+    c.append(el("div", "label", "주된 생각"), el("div", m.main_thought ? null : "empty", m.main_thought || NOT_FOUND));
+    return c;
+  })));
+
+  const oq = el("ul");
+  for (const q of r.open_questions) oq.append(el("li", null, q));
+  out.append(section("남은 질문", r.open_questions.length ? [oq] : []));
+
+  if (r.other_topics.length) {
+    const ot = el("ul");
+    for (const t of r.other_topics) {
+      const li = el("li", null, t);
+      const more = el("button", "more", "더 알아보기");
+      const slot = el("div");
+      more.onclick = () => expandTopic(t, slot, more);
+      li.append(more, slot);
+      ot.append(li);
+    }
+    out.append(section("그 밖에 나온 이야기", [ot]));
+  }
+}
+
+function showFailure() {
+  const c = el("div", "card error");
+  c.append(el("p", null, "지금 정리할 수 없어요."));
+  const retry = el("button", null, "다시 시도");
+  retry.onclick = run;
+  c.append(retry);
+  $("out").replaceChildren(c);
+}
+
+async function run() {
+  const transcript = $("transcript").value;
+  $("go").disabled = true;
+  $("out").replaceChildren(el("p", "muted", "정리하는 중이에요… (1분 정도 걸릴 수 있어요)"));
+  try {
+    const res = await fetch("/api/summarize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript, names: currentNames() }),
+    });
+    const data = await res.json();
+    if (data.status === "ok") render(data.result);
+    else if (data.status === "empty") $("out").replaceChildren(el("p", "empty", data.message));
+    else showFailure();
+  } catch {
+    showFailure();
+  } finally {
+    $("go").disabled = false;
+  }
+}
+
+$("go").onclick = run;
+$("transcript").addEventListener("input", refreshSpeakers);
+$("sample").onclick = async () => {
+  const data = await (await fetch("/api/sample")).json();
+  $("transcript").value = data.transcript;
+  refreshSpeakers();
+};
+
+fetch("/api/sample").then((r) => r.json()).then((data) => {
+  if (data.testMode) {
+    $("test").hidden = false;
+    $("test").textContent = `테스트 모드: AI 대신 ${data.testMode} 의 준비된 응답으로 화면을 그려요.`;
+  }
+});
+</script>
+</body>
+</html>

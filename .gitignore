@@ -1,4 +1,6 @@
 node_modules/
+__pycache__/
+*.pyc
 
 # 비밀 값: API 키 등은 .env 계열 파일에만 두고 커밋하지 않는다
 .env
